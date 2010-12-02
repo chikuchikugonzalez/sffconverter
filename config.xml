@@ -4,7 +4,7 @@
     <palette group="1" number="1" act="kfm/kfm.act" />
     <palette group="1" number="2" act="kfm/kfm2.act" />
     <palette group="1" number="3" act="kfm/kfm3.act" />
-    <palette group="1" number="4" act="kfm/kfm4.act" />
+    <palette group="1" number="4" act="kfm/kfm4.act" default="yes" />
     <palette group="1" number="5" act="kfm/kfm5.act" />
     <palette group="1" number="6" act="kfm/kfm6.act" />
   </sffconverter>

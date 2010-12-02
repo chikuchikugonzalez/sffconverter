@@ -6,6 +6,7 @@
 from __future__ import with_statement
 import os
 import sys
+import string
 
 # xml
 import xml.sax
@@ -47,6 +48,11 @@ class Configuration(xml.sax.handler.ContentHandler):
                 pal['group'] = int(attrs['group'])
                 pal['number'] = int(attrs['number'])
                 pal['act'] = attrs['act']
+                pal['default'] = False
+                if attrs.has_key('default'):
+                    print attrs['default']
+                    if string.lower(attrs['default']) == 'true' or string.lower(attrs['default']) == 'yes':
+                        pal['default'] = True
                 self.__palettes.append(pal)
         if name == 'sffconverter':
             self.__inConverterSection = True
@@ -75,22 +81,28 @@ if __name__ == '__main__':
         sff = sff.SFF()
 
         # Append Default Palettes
+        defaultPalIndex = 0
+        palIndex = 0
         for palinfo in config.palettes:
             with open(palinfo['act'], "rb") as fp:
-                sff.addPalette(fp, palinfo['group'], palinfo['number'])
+                sff.addPalette(fp, palinfo['group'], palinfo['number'], True)
+            if palinfo['default']:
+                defaultPalIndex = palIndex
+            palIndex += 1
+        sff.setDefaultPaletteNumber(defaultPalIndex)
         with open(config.input, "rb") as fp:
             sff.read(fp)
-
         # Debug
-        print "#Sprites = %d, #Palettes = %d" % (len(sff.sprites), len(sff.palettes))
-        for pal in sff.palettes:
-            print "<pal %d.%d>" % (pal.group, pal.number)
-            print "Length = %d" % len(pal.dataAsRGBA())
-        for spr in sff.sprites:
-            print "<spr %d.%d>" % (spr.group, spr.number)
-            print "%dx%d,%dx%d" % (spr.axis[0], spr.axis[1], spr.width, spr.height)
-            if spr.linkedIndex == 0:
-                print "Length = %d / %d" % (len(spr.data), len(spr.compressedData))
+        #print "#Sprites = %d, #Palettes = %d" % (len(sff.sprites), len(sff.palettes))
+        #for pal in sff.palettes:
+        #    print "<pal %d.%d>" % (pal.group, pal.number)
+        #    print "Length = %d" % len(pal.dataAsRGBA())
+        #for spr in sff.sprites:
+        #    print "<spr %d.%d>" % (spr.group, spr.number)
+        #    print "%dx%d,%dx%d" % (spr.axis[0], spr.axis[1], spr.width, spr.height)
+        #    print "Palette = %d" % spr.paletteNumber
+        #    if spr.linkedIndex == 0:
+        #        print "Length = %d / %d" % (len(spr.data), len(spr.compressedData))
 
         # Write
         with open(config.output, "wb") as fp:

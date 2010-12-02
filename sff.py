@@ -19,6 +19,7 @@ class SFFPalette(object):
         self.__paletteNo = 0
         self.__data = None
         self.__colors = 256
+        self.__reversed = False
 
     #
     # Properties
@@ -57,17 +58,24 @@ class SFFPalette(object):
     def colors(self, value):
         self.__colors = value
 
+    @property
+    def reversed(self):
+        return self.__reversed
+    @reversed.setter
+    def reversed(self, value):
+        self.__reversed = value
+
     #
     # Methods
     #
-    def dataAsRGBA(self, reverse = False):
+    def dataAsRGBA(self):
         bytes = array.array('c')
         for i in range(0, len(self.data), 3):
             r = self.data[i]
             g = self.data[i + 1]
             b = self.data[i + 2]
             a = '\x00'
-            if reverse:
+            if self.reversed:
                 bytes.append(a)
                 bytes.append(b)
                 bytes.append(g)
@@ -77,7 +85,7 @@ class SFFPalette(object):
                 bytes.append(g)
                 bytes.append(b)
                 bytes.append(a)
-        if reverse:
+        if self.reversed:
             bytes.reverse()
         dataset = bytes.tostring()
         if len(dataset) < 1024:
@@ -222,6 +230,7 @@ class SFF(object):
     def __init__(self):
         self.__palettes = []
         self.__sprites = []
+        self.__defaultPaletteNumber = 0
 
     #
     # Properties
@@ -237,12 +246,18 @@ class SFF(object):
     #
     # Methods
     #
-    def addPalette(self, fp, group, number):
+    def addPalette(self, fp, group, number, reversed = False):
         palette = SFFPalette()
         palette.group = group
         palette.number = number
+        palette.reversed = reversed
         palette.data = fp.read()
         self.palettes.append(palette)
+
+    def setDefaultPaletteNumber(self, palIndex = 0):
+        old = self.__defaultPaletteNumber
+        self.__defaultPaletteNumber = palIndex
+        return old
 
     def read(self, fp):
         # Reading Signatures
@@ -254,14 +269,21 @@ class SFF(object):
             raise "Input source is not supported SFF Version"
 
         # Reading Headers
+        print "<Read Headers>",
         numGroups, numSprites = struct.unpack('<II', fp.read(8))
         subfileOffset, headerSize = struct.unpack('<II', fp.read(8))
+        print "done."
 
         # Reading sprites
+        print "<Read Sprites>"
         offset = subfileOffset
-        paletteIndex = 0
+        paletteIndex = self.__defaultPaletteNumber
         paletteData = '\x00' * 768
+        _index = 0
         for i in range(0, numSprites):
+            print "\tReading sprite %d..." % _index,
+            _index += 1
+
             # Reading Sprite
             fp.seek(offset, 0)      # Seeking to sprite offset
             sprite = SFFSprite()
@@ -291,16 +313,20 @@ class SFF(object):
                     palette = SFFPalette()
                     palette.group = groupNo
                     palette.number = imageNo
-                    paletteData = data[-768:0]
+                    paletteData = data[-768:]
                     palette.data = paletteData
 
-                    self.palettes.append(palette)
+                    self.__palettes.append(palette)
                     if (groupNo == 9000 and imageNo == 0) or (groupNo == 0 and imageNo == 0):
-                        paletteIndex = 0
+                        paletteIndex = self.__defaultPaletteNumber
                     else:
-                        paletteIndex = len(self.palettes) - 1
+                        paletteIndex = len(self.__palettes) - 1
                 else:
                     data += paletteData
+                    # Set Palette Number if Head Sprite
+                    if (groupNo == 9000 and imageNo == 0) or (groupNo == 0 and imageNo == 0):
+                        paletteIndex = self.__defaultPaletteNumber
+
                 pcxImage = pcx.PCXImage()
                 pcxImage.load(data)
 
@@ -310,14 +336,18 @@ class SFF(object):
                 sprite.paletteNumber = paletteIndex
             else:
                 # Clone
-                sprite.width = self.sprites[linkedIndex].width
-                sprite.height = self.sprites[linkedIndex].height
-                sprite.paletteNumber = self.sprites[linkedIndex].paletteNumber
-            self.sprites.append(sprite)
+                sprite.width = self.__sprites[linkedIndex].width
+                sprite.height = self.__sprites[linkedIndex].height
+                sprite.paletteNumber = self.__sprites[linkedIndex].paletteNumber
+            self.__sprites.append(sprite)
             offset = nextOffset
+
+            # Debug
+            print "done."
 
     def write(self, fp):
         # Pre-process
+        print "Pre-Processing...",
         headerSize = 512
         numberOfSprites = len(self.sprites)
         numberOfPalettes = len(self.palettes)
@@ -331,9 +361,11 @@ class SFF(object):
         for spr in self.sprites:
             if spr.linkedIndex == 0:
                 totalDataSize += (len(spr.compressedData) + 4)
+        print "done."
 
         # Writing
         # Writing Headers
+        print "Writing Headers...",
         fp.write("ElecbyteSpr\x00")         # Signature
         fp.write("\x00\x00\x00\x02")        # Version Number
         fp.write("\x00" * 10)               # Unknown Area
@@ -348,8 +380,10 @@ class SFF(object):
         fp.write(struct.pack('<I', totalDataSize + headerSize + spriteNodeListSize + paletteMapSize))       # All
         fp.write(struct.pack('<I', 0))                  # Translation Data Size
         fp.write("\x00" * 444)                  # Unused
+        print "done."
 
         # Writing Palette Maps
+        print "Writing Palette Maps...",
         paletteDataOffset = 0   #dataOffset
         for pal in self.palettes:
             fp.write(struct.pack('<H', pal.group))      # GroupNo
@@ -358,8 +392,10 @@ class SFF(object):
             fp.write(struct.pack('<I', paletteDataOffset))  # Offset into data
             fp.write(struct.pack('<I', 1024))           # Palette data length (0: linked)
             paletteDataOffset += 1024
+        print "done."
 
         # Writing Sprite Node
+        print "Writing Sprite Node List...",
         spriteDataOffset = (1024 * numberOfPalettes)    #dataOffset + (1024 * numberOfPalettes)
         spriteDataOffsetMapping = {}
         index = 0
@@ -385,14 +421,19 @@ class SFF(object):
             fp.write(struct.pack('<H', 0))                  # Flags (0:Literal Data, other: Translate
             spriteDataOffset += spriteDataLength
             index += 1
+        print "done."
 
         # Writing Palette Data
+        print "Writing Palette Data...",
         for pal in self.palettes:
             fp.write(pal.dataAsRGBA())
+        print "done."
         # Writing sprite data
+        print "Writing Sprite Data...",
         for spr in self.sprites:
             if spr.linkedIndex == 0:
                 data = spr.compressedData
                 spriteDataLength = len(spr.data)
                 fp.write(struct.pack('<I', spriteDataLength))
                 fp.write(data)
+        print "done."
