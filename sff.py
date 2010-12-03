@@ -281,7 +281,7 @@ class SFF(object):
         paletteData = '\x00' * 768
         _index = 0
         for i in range(0, numSprites):
-            print "\tReading sprite %d..." % _index,
+            print "\tReading sprite %d/%d..." % (i + 1, numSprites),
             _index += 1
 
             # Reading Sprite
@@ -344,10 +344,14 @@ class SFF(object):
 
             # Debug
             print "done."
+        print "all done."
 
     def write(self, fp):
+        print "<Writing SFF>"
+
         # Pre-process
-        print "Pre-Processing...",
+        print "Pre-Processing..."
+        print "\tInitializing headers...",
         headerSize = 512
         numberOfSprites = len(self.sprites)
         numberOfPalettes = len(self.palettes)
@@ -355,13 +359,16 @@ class SFF(object):
         paletteMapSize = 16 * numberOfPalettes
         paletteMapOffset = 512
         spriteNodeListOffset = 512 + paletteMapSize
+        print "done."
 
         dataOffset = spriteNodeListOffset + spriteNodeListSize
         totalDataSize = 1024 * numberOfPalettes
+        print "\tCalculating data sizes...",
         for spr in self.sprites:
             if spr.linkedIndex == 0:
                 totalDataSize += (len(spr.compressedData) + 4)
         print "done."
+        print "all done."
 
         # Writing
         # Writing Headers
@@ -385,28 +392,30 @@ class SFF(object):
         # Writing Palette Maps
         print "Writing Palette Maps...",
         paletteDataOffset = 0   #dataOffset
-        for pal in self.palettes:
+        for i, pal in enumerate(self.palettes):
+            print "\tWriting Palette Map %d/%d..." % (i + 1, numberOfPalettes),
             fp.write(struct.pack('<H', pal.group))      # GroupNo
             fp.write(struct.pack('<H', pal.number))     # ItemNo
             fp.write(struct.pack('<I', pal.colors))     # Number of Colors
             fp.write(struct.pack('<I', paletteDataOffset))  # Offset into data
             fp.write(struct.pack('<I', 1024))           # Palette data length (0: linked)
             paletteDataOffset += 1024
-        print "done."
+            print "done."
+        print "all done."
 
         # Writing Sprite Node
         print "Writing Sprite Node List...",
         spriteDataOffset = (1024 * numberOfPalettes)    #dataOffset + (1024 * numberOfPalettes)
         spriteDataOffsetMapping = {}
-        index = 0
-        for spr in self.sprites:
+        for i, spr in enumerate(self.sprites):
+            print "\tWriting Sprite Node %d/%d..." % (i + 1, numberOfSprites),
             spriteDataLength = 0
             _offset = spriteDataOffset
             if spr.linkedIndex == 0:
                 spriteDataLength = len(spr.compressedData) + 4
             else:
                 _offset = spriteDataOffsetMapping[spr.linkedIndex]
-            spriteDataOffsetMapping[index] = _offset
+            spriteDataOffsetMapping[i] = _offset
             fp.write(struct.pack('<H', spr.group))          # Group No
             fp.write(struct.pack('<H', spr.number))         # Item No
             fp.write(struct.pack('<H', spr.width))          # Width
@@ -420,20 +429,26 @@ class SFF(object):
             fp.write(struct.pack('<H', spr.paletteNumber))  # Palette Number (Palette Index)
             fp.write(struct.pack('<H', 0))                  # Flags (0:Literal Data, other: Translate
             spriteDataOffset += spriteDataLength
-            index += 1
-        print "done."
+            print "done."
+        print "all done."
 
         # Writing Palette Data
         print "Writing Palette Data...",
-        for pal in self.palettes:
+        for i, pal in enumerate(self.palettes):
+            print "\tWriting Palette %d/%d" % (i + 1, numberOfPalettes),
             fp.write(pal.dataAsRGBA())
-        print "done."
+            print "done."
+        print "all done."
         # Writing sprite data
         print "Writing Sprite Data...",
-        for spr in self.sprites:
+        for i, spr in enumerate(self.sprites):
+            print "\tWriting Sprite %d/%d..." % (i + 1, numberOfSprites),
             if spr.linkedIndex == 0:
                 data = spr.compressedData
                 spriteDataLength = len(spr.data)
                 fp.write(struct.pack('<I', spriteDataLength))
                 fp.write(data)
-        print "done."
+                print "done."
+            else:
+                print "Skipped (Cloned)"
+        print "all done. finished."

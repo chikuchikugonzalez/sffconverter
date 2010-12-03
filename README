@@ -1,6 +1,7 @@
 ================================================================================
 名称 : sffconverter
 作者 : chikuchikugonzalez (chikuchikugonzalez@gmail.com)
+Web  : http://d.hatena.ne.jp/chikuchikugonzalez/
 ================================================================================
 [概要]
 MUGENで使われているSFFファイルの変換を行うスクリプトを作ろうというプロジェクト。
@@ -10,9 +11,15 @@ MUGENで使われているSFFファイルの変換を行うスクリプトを作
 [言語]
 今のところPython 2.6です。
 
-[使用方法]
+[使用方法 : sffconverter.py]
 $> python sffconverter.py <config.xml>
 
 <config.xml>
 ・入力sff, 出力sff, パレットリストを定義する設定ファイル
-・.defを指定して作成できるスクリプトを作成予定
+・.defを指定して作成できるスクリプトを作成予定 ==> 作りました
+
+[使用方法 : configgenerator.py]
+$> python configgenerator.py [<入力.defファイル> [<出力.xmlファイル>]]
+
+<入力.defファイル>	元にするMUGENキャラクターの.defファイル。指定しない場合はsys.stdin
+<出力.xmlファイル>	出力する<config.xml>ファイル名。指定しない場合はsys.stdout
